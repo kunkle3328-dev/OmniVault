@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Note } from '../types';
-import { X, Save, Trash2, Bold, Italic, List, Type, Tag as TagIcon,AtSign, Search } from 'lucide-react';
+import { X, Save, Type, Tag as TagIcon, AtSign, Zap, Sparkles, Link as LinkIcon, Trash2, Plus } from 'lucide-react';
 
 interface NoteModalProps {
   note: Note | null;
-  allNotes: Note[]; // Added to provide context for links and tags
+  allNotes: Note[];
   isOpen: boolean;
   onClose: () => void;
   onSave: (noteData: Partial<Note>) => void;
@@ -19,22 +18,12 @@ const NoteModal: React.FC<NoteModalProps> = ({ note, allNotes, isOpen, onClose, 
   const [tagInput, setTagInput] = useState('');
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(-1);
-  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Derive unique tags from all notes for suggestions
-  const allExistingTags = useMemo(() => {
-    const tags = new Set<string>();
-    allNotes.forEach(n => n.tags.forEach(t => tags.add(t)));
-    return Array.from(tags);
-  }, [allNotes]);
-
-  const tagSuggestions = useMemo(() => {
-    if (!tagInput.trim()) return [];
-    return allExistingTags.filter(t => 
-      t.toLowerCase().includes(tagInput.toLowerCase()) && !activeTags.includes(t)
-    ).slice(0, 5);
-  }, [tagInput, allExistingTags, activeTags]);
+  const backlinks = useMemo(() => {
+    if (!note) return [];
+    return allNotes.filter(n => n.content.includes(`[[${note.title}]]`) || n.content.includes(note.title));
+  }, [note, allNotes]);
 
   const noteSuggestions = useMemo(() => {
     if (mentionQuery === null) return [];
@@ -47,41 +36,20 @@ const NoteModal: React.FC<NoteModalProps> = ({ note, allNotes, isOpen, onClose, 
     if (note) {
       setTitle(note.title);
       setContent(note.content);
-      setActiveTags(note.tags);
+      setActiveTags(note.tags || []);
     } else {
       setTitle('');
       setContent('');
       setActiveTags([]);
     }
-    setTagInput('');
-    setMentionQuery(null);
   }, [note, isOpen]);
-
-  const insertFormatting = (prefix: string, suffix: string = '') => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const selectedText = text.substring(start, end);
-    const before = text.substring(0, start);
-    const after = text.substring(end);
-    const newText = `${before}${prefix}${selectedText}${suffix}${after}`;
-    setContent(newText);
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + prefix.length, end + prefix.length);
-    }, 0);
-  };
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setContent(value);
-
     const selectionStart = e.target.selectionStart;
     const textBeforeCursor = value.substring(0, selectionStart);
     const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
-
     if (lastAtSymbol !== -1 && (lastAtSymbol === 0 || /\s/.test(textBeforeCursor[lastAtSymbol - 1]))) {
       const query = textBeforeCursor.substring(lastAtSymbol + 1);
       if (!/\s/.test(query)) {
@@ -96,151 +64,166 @@ const NoteModal: React.FC<NoteModalProps> = ({ note, allNotes, isOpen, onClose, 
   const insertMention = (noteTitle: string) => {
     if (mentionIndex === -1) return;
     const before = content.substring(0, mentionIndex);
-    const after = content.substring(textareaRef.current?.selectionStart || 0);
-    const newText = `${before}[[${noteTitle}]]${after}`;
-    setContent(newText);
+    const selectionStart = textareaRef.current?.selectionStart || mentionIndex + (mentionQuery?.length || 0) + 1;
+    const after = content.substring(selectionStart);
+    setContent(`${before}[[${noteTitle}]]${after}`);
     setMentionQuery(null);
-    textareaRef.current?.focus();
+    setTimeout(() => textareaRef.current?.focus(), 0);
   };
 
-  const addTag = (tag: string) => {
-    const cleanTag = tag.trim().toLowerCase();
-    if (cleanTag && !activeTags.includes(cleanTag)) {
-      setActiveTags([...activeTags, cleanTag]);
+  const addTag = () => {
+    if (tagInput.trim() && !activeTags.includes(tagInput.trim())) {
+      setActiveTags([...activeTags, tagInput.trim()]);
+      setTagInput('');
     }
-    setTagInput('');
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setActiveTags(activeTags.filter(t => t !== tagToRemove));
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-[#16161a] border border-[#27272a] rounded-3xl w-full max-w-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-8 py-5 border-b border-[#27272a]">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${note ? 'bg-purple-500/20 text-purple-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-              <Type size={20} />
-            </div>
-            <h2 className="text-xl font-bold text-white tracking-tight">
-              {note ? 'Refine Knowledge' : 'Capture Insight'}
-            </h2>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-[#27272a] rounded-full transition-colors text-zinc-500 hover:text-white">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-8 space-y-6">
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-2 px-1">Concept Title</label>
-            <input 
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-[#0d0d0f] border border-[#27272a] rounded-2xl py-4 px-5 focus:ring-2 focus:ring-purple-500 outline-none text-white text-lg font-medium placeholder:text-zinc-700 transition-all"
-              placeholder="e.g. Synthesis of Martian Soil"
-            />
-          </div>
-
-          <div className="space-y-2 relative">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-2 px-1">Structured Content</label>
-            
-            <div className="flex items-center gap-1 p-1 bg-[#0d0d0f] border border-[#27272a] rounded-t-2xl">
-              <button onClick={() => insertFormatting('**', '**')} className="p-2.5 hover:bg-[#1f1f23] rounded-xl text-zinc-400 hover:text-white transition-all"><Bold size={16} /></button>
-              <button onClick={() => insertFormatting('*', '*')} className="p-2.5 hover:bg-[#1f1f23] rounded-xl text-zinc-400 hover:text-white transition-all"><Italic size={16} /></button>
-              <button onClick={() => insertFormatting('\n- ', '')} className="p-2.5 hover:bg-[#1f1f23] rounded-xl text-zinc-400 hover:text-white transition-all"><List size={16} /></button>
-              <div className="w-px h-6 bg-[#27272a] mx-1"></div>
-              <span className="text-[10px] text-zinc-600 px-2 font-mono italic">Markdown + @ Mention Links</span>
-            </div>
-
-            <textarea 
-              ref={textareaRef}
-              value={content}
-              onChange={handleTextareaChange}
-              className="w-full bg-[#0d0d0f] border-x border-b border-[#27272a] rounded-b-2xl py-5 px-5 focus:ring-2 focus:ring-purple-500 outline-none text-zinc-300 min-h-[250px] leading-relaxed resize-none font-sans placeholder:text-zinc-800 transition-all"
-              placeholder="Detail the research... Type @ to link another note."
-            />
-
-            {/* Mention Suggestions UI */}
-            {mentionQuery !== null && noteSuggestions.length > 0 && (
-              <div className="absolute left-4 right-4 bottom-full mb-2 bg-[#1f1f23] border border-purple-500/30 rounded-xl shadow-2xl overflow-hidden z-[110] animate-in slide-in-from-bottom-2">
-                <div className="px-4 py-2 bg-purple-500/10 border-b border-purple-500/20 text-[10px] font-bold text-purple-400 uppercase tracking-widest">Link Note</div>
-                {noteSuggestions.map(n => (
-                  <button 
-                    key={n.id} 
-                    onClick={() => insertMention(n.title)}
-                    className="w-full text-left px-4 py-3 hover:bg-purple-500/20 transition-colors flex items-center justify-between group"
-                  >
-                    <span className="text-zinc-200 group-hover:text-white font-medium">{n.title}</span>
-                    <AtSign size={14} className="text-zinc-600 group-hover:text-purple-400" />
-                  </button>
-                ))}
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-2 md:p-4 bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
+      <div className="bg-[#0f0f12] border border-red-900/20 rounded-[1.5rem] md:rounded-[3rem] w-full max-w-5xl overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)] flex flex-col md:flex-row h-[90vh] md:h-[80vh]">
+        
+        {/* Main Editor Section */}
+        <div className="flex-1 flex flex-col min-w-0 border-r border-zinc-900/50">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 md:px-10 md:py-6 border-b border-zinc-900/50 bg-zinc-950/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 md:p-3 rounded-xl bg-red-950/30 text-red-600 border border-red-900/20">
+                <Type size={18} className="md:w-6 md:h-6" />
               </div>
-            )}
+              <h2 className="text-sm md:text-xl font-black text-white tracking-widest uppercase">NODE REFINE</h2>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-zinc-900 rounded-full transition-colors text-zinc-500">
+              <X size={20} className="md:w-6 md:h-6" />
+            </button>
           </div>
 
-          <div className="space-y-3">
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] mb-1 px-1">Taxonomy (Tags)</label>
-            <div className="flex flex-wrap gap-2 mb-3 min-h-[40px] p-4 bg-[#0d0d0f] border border-[#27272a] rounded-2xl">
-              {activeTags.length === 0 && <span className="text-zinc-700 text-xs italic">No tags assigned...</span>}
-              {activeTags.map(tag => (
-                <span key={tag} className="flex items-center gap-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 px-3 py-1.5 rounded-xl text-xs font-mono">
-                  {tag}
-                  <button onClick={() => removeTag(tag)} className="hover:text-white transition-colors">
-                    <X size={14} />
-                  </button>
-                </span>
-              ))}
-            </div>
-            
-            <div className="relative">
+          {/* Editor Body */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-4 md:space-y-6 no-scrollbar">
+            <div className="space-y-1">
+              <label className="text-[8px] md:text-[10px] font-black text-red-900/60 uppercase tracking-widest">Knowledge Label</label>
               <input 
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addTag(tagInput)}
-                className="w-full bg-[#0d0d0f] border border-[#27272a] rounded-2xl py-4 px-10 focus:ring-2 focus:ring-purple-500 outline-none text-zinc-400 font-mono text-sm placeholder:text-zinc-800 transition-all"
-                placeholder="Type and press Enter to add tags..."
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full bg-transparent border-none text-xl md:text-4xl font-black text-white outline-none placeholder:text-zinc-800 tracking-tighter"
+                placeholder="INSIGHT_TITLE..."
               />
-              <TagIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={16} />
-              
-              {/* Tag Suggestions */}
-              {tagSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-2 bg-[#1f1f23] border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden">
-                  {tagSuggestions.map(tag => (
-                    <button 
-                      key={tag}
-                      onClick={() => addTag(tag)}
-                      className="w-full text-left px-4 py-3 hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-purple-400 flex items-center gap-2"
-                    >
-                      <Search size={14} />
-                      {tag}
-                    </button>
-                  ))}
+            </div>
+
+            {/* Enhanced Tag System for Mobile Integration */}
+            <div className="space-y-2">
+              <label className="text-[8px] md:text-[10px] font-black text-zinc-700 uppercase tracking-widest">Semantic Metadata</label>
+              <div className="flex flex-wrap items-center gap-2">
+                {activeTags.map(tag => (
+                  <span key={tag} className="flex items-center gap-1.5 bg-red-950/20 text-red-600 border border-red-900/20 px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest group">
+                    {tag}
+                    <button onClick={() => setActiveTags(prev => prev.filter(t => t !== tag))} className="opacity-30 hover:opacity-100 transition-all"><X size={10} /></button>
+                  </span>
+                ))}
+                
+                <div className="flex items-center bg-zinc-950/50 border border-zinc-900 rounded-lg overflow-hidden group focus-within:border-red-900/50 transition-all">
+                  <input 
+                    value={tagInput} 
+                    onChange={e => setTagInput(e.target.value)} 
+                    onKeyDown={e => e.key === 'Enter' && addTag()} 
+                    className="bg-transparent px-3 py-1 text-[9px] md:text-xs text-zinc-400 outline-none w-24 md:w-32 placeholder:text-zinc-800" 
+                    placeholder="New Tag..." 
+                  />
+                  <button 
+                    onClick={addTag}
+                    disabled={!tagInput.trim()}
+                    className="bg-red-950/30 text-red-700 hover:text-red-500 px-2 py-1 transition-all disabled:opacity-0"
+                  >
+                    <Plus size={14} strokeWidth={3} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1 relative flex-1 flex flex-col">
+              <label className="text-[8px] md:text-[10px] font-black text-zinc-700 uppercase tracking-widest">Neural Log</label>
+              <textarea 
+                ref={textareaRef}
+                value={content}
+                onChange={handleTextareaChange}
+                className="flex-1 w-full bg-[#08080a] border border-zinc-900 rounded-xl md:rounded-[2rem] py-4 px-4 md:py-8 md:px-8 focus:border-red-800/50 outline-none text-zinc-400 leading-relaxed resize-none font-sans transition-all text-xs md:text-lg shadow-inner min-h-[250px]"
+                placeholder="Initiate entry... Mention nodes with @"
+              />
+
+              {mentionQuery !== null && (
+                <div className="absolute left-2 right-2 bottom-full mb-2 z-[1100]">
+                  <div className="bg-[#16161a] border border-red-900/40 rounded-xl shadow-2xl overflow-hidden max-w-[280px]">
+                    <div className="px-3 py-1.5 bg-red-950/30 border-b border-red-900/30 text-[7px] font-black text-red-500 uppercase tracking-widest flex items-center justify-between">
+                      <span>SYNC_SUGGESTIONS</span>
+                      <Sparkles size={8} />
+                    </div>
+                    {noteSuggestions.map(n => (
+                      <button 
+                        key={n.id} 
+                        onClick={() => insertMention(n.title)}
+                        className="w-full text-left px-4 py-2 hover:bg-red-900/20 transition-colors flex items-center justify-between group border-b border-zinc-900/30"
+                      >
+                        <span className="text-zinc-400 group-hover:text-white font-black text-[9px] truncate uppercase">{n.title}</span>
+                        <AtSign size={12} className="text-zinc-800 group-hover:text-red-700" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           </div>
+
+          {/* Action Footer */}
+          <div className="px-4 py-4 md:px-10 md:py-8 bg-[#08080a]/80 border-t border-zinc-900 flex items-center justify-between">
+            <div className="flex gap-4 md:gap-8">
+              <button 
+                onClick={() => { if (note && onDelete) { onDelete(note.id); onClose(); } }} 
+                className="text-zinc-800 hover:text-red-800 transition-colors flex items-center gap-1.5"
+              >
+                <Trash2 size={14} className="md:w-4 md:h-4" />
+                <span className="text-[8px] md:text-[10px] font-black uppercase tracking-widest hidden sm:inline">PURGE_NODE</span>
+              </button>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={onClose} className="text-zinc-700 hover:text-white font-black text-[9px] md:text-[11px] uppercase tracking-widest transition-all">DISCARD</button>
+              <button 
+                onClick={() => { if (title.trim()) { onSave({ title, content, tags: activeTags }); onClose(); } }} 
+                className="bg-red-800 hover:bg-red-700 text-white px-5 py-2 md:px-10 md:py-4 rounded-lg md:rounded-2xl font-black shadow-lg transition-all flex items-center gap-2 uppercase tracking-widest text-[9px] md:text-xs"
+              >
+                <Save size={14} className="md:w-5 md:h-5" /> COMMIT_NODE
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="px-8 py-5 bg-[#1f1f23]/50 border-t border-[#27272a] flex items-center justify-between">
-          <div>
-            {note && onDelete && (
-              <button onClick={() => { onDelete(note.id); onClose(); }} className="flex items-center gap-2 text-zinc-500 hover:text-red-400 transition-all text-xs font-bold uppercase tracking-widest group">
-                <Trash2 size={16} className="group-hover:animate-pulse" /> Purge
-              </button>
-            )}
+        {/* Info Sidebar (Desktop) / Hidden on small screens for cleaner mobile flow */}
+        <div className="hidden md:flex w-80 bg-[#08080a] flex-col overflow-hidden">
+          <div className="p-8 border-b border-zinc-900 bg-zinc-950/30">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-red-900/60">NODE_GRAPH</h3>
           </div>
-          <div className="flex gap-4">
-            <button onClick={onClose} className="px-6 py-3 rounded-2xl text-xs font-bold text-zinc-500 uppercase tracking-widest hover:text-white transition-all">Discard</button>
-            <button onClick={() => {
-              onSave({ title, content, tags: activeTags });
-              onClose();
-            }} className="flex items-center gap-3 bg-purple-600 hover:bg-purple-500 text-white px-8 py-3 rounded-2xl text-sm font-black transition-all shadow-xl shadow-purple-500/20 active:scale-95 group">
-              <Save size={18} /> Commit to Vault
-            </button>
+          <div className="flex-1 overflow-y-auto p-8 space-y-10 no-scrollbar">
+            <div className="space-y-4">
+               <h4 className="text-[9px] font-black uppercase tracking-widest text-zinc-600 flex items-center gap-2"><LinkIcon size={12}/> BIDIRECTIONAL_LINKS</h4>
+               <div className="space-y-2">
+                 {backlinks.length === 0 ? (
+                   <p className="text-[9px] italic text-zinc-800 uppercase font-black">Isolated Entity</p>
+                 ) : (
+                  backlinks.map(bl => (
+                    <div key={bl.id} className="p-3 bg-[#0f0f12] border border-zinc-900 rounded-xl group hover:border-red-900/30 transition-all cursor-pointer">
+                      <p className="text-[10px] font-black text-zinc-500 group-hover:text-red-600 transition-colors uppercase truncate">{bl.title}</p>
+                    </div>
+                  ))
+                 )}
+               </div>
+            </div>
+
+            <div className="p-6 bg-red-950/10 border border-red-900/20 rounded-2xl space-y-3">
+               <div className="flex items-center gap-2 text-[8px] font-black uppercase tracking-widest text-red-600">
+                 <Zap size={12} className="fill-red-600" /> SYSTEM_ADVICE
+               </div>
+               <p className="text-[10px] text-zinc-600 leading-relaxed font-bold uppercase">Cross-reference with [SYNT_INTEL] nodes for optimized Vault synthesis.</p>
+            </div>
           </div>
         </div>
       </div>

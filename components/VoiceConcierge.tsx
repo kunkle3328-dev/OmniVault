@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { GoogleGenAI, Modality } from '@google/genai';
 import { Mic, Volume2 } from 'lucide-react';
@@ -18,7 +17,6 @@ const VoiceConcierge: React.FC<Props> = ({ notesContext }) => {
 
   const startSession = async () => {
     setIsConnecting(true);
-    // Correct initialization using named parameter and environment variable directly
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
@@ -31,13 +29,11 @@ const VoiceConcierge: React.FC<Props> = ({ notesContext }) => {
         onopen: () => {
           setIsActive(true);
           setIsConnecting(false);
-          // Solely rely on sessionPromise resolves to send input to avoid race conditions
           startMic(sessionPromise);
         },
         onmessage: async (message) => {
           const audioBase64 = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
           if (audioBase64 && audioContext.current) {
-            // Schedule audio chunks precisely to ensure gapless playback
             nextStartTime.current = Math.max(nextStartTime.current, audioContext.current.currentTime);
             const raw = decode(audioBase64);
             const buffer = await decodeAudioData(raw, audioContext.current, 24000, 1);
@@ -47,9 +43,7 @@ const VoiceConcierge: React.FC<Props> = ({ notesContext }) => {
             source.start(nextStartTime.current);
             nextStartTime.current = nextStartTime.current + buffer.duration;
           }
-          
           if (message.serverContent?.interrupted) {
-            // Reset timing on interruption
             nextStartTime.current = 0;
           }
         },
@@ -80,11 +74,9 @@ const VoiceConcierge: React.FC<Props> = ({ notesContext }) => {
         
         const pcmBlob = {
           data: encode(new Uint8Array(int16.buffer)),
-          // Using audio/pcm;rate=16000 as required for Live API
           mimeType: 'audio/pcm;rate=16000',
         };
 
-        // CRITICAL: Always use the resolved session promise to send data
         sessionPromise.then((session) => {
           session.sendRealtimeInput({ media: pcmBlob });
         });
@@ -93,7 +85,7 @@ const VoiceConcierge: React.FC<Props> = ({ notesContext }) => {
       source.connect(processor);
       processor.connect(inputCtx.destination);
     } catch (err) {
-      console.error("Mic access denied or configuration error:", err);
+      console.error("Mic error:", err);
       setIsActive(false);
     }
   };
@@ -104,29 +96,33 @@ const VoiceConcierge: React.FC<Props> = ({ notesContext }) => {
   };
 
   return (
-    <div className={`p-6 rounded-2xl border transition-all duration-500 flex items-center justify-between ${
-      isActive ? 'bg-purple-900/40 border-purple-500 shadow-[0_0_30px_rgba(168,85,247,0.2)]' : 'bg-zinc-900/40 border-zinc-800'
+    <div className={`p-8 rounded-[2rem] border transition-all duration-700 flex items-center justify-between ${
+      isActive ? 'bg-red-950/20 border-red-600/50 shadow-[0_0_50px_rgba(220,38,38,0.15)]' : 'bg-zinc-900/40 border-zinc-800'
     }`}>
-      <div className="flex items-center gap-4">
-        <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-          isActive ? 'bg-purple-500 animate-pulse' : 'bg-zinc-800'
+      <div className="flex items-center gap-6">
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${
+          isActive ? 'bg-red-600 shadow-[0_0_20px_rgba(220,38,38,0.4)]' : 'bg-zinc-800'
         }`}>
-          {isActive ? <Volume2 className="text-white" /> : <Mic className="text-zinc-500" />}
+          {isActive ? <Volume2 className="text-white" size={28} /> : <Mic className="text-zinc-500" size={28} />}
         </div>
         <div>
-          <h3 className="font-bold text-lg">{isActive ? 'Concierge Online' : 'Voice Interface'}</h3>
-          <p className="text-xs text-zinc-500">{isActive ? 'Speaking with your Vault...' : 'Talk to your knowledge base'}</p>
+          <h3 className={`font-black text-xl tracking-tight ${isActive ? 'text-red-500' : 'text-zinc-300'}`}>
+            {isActive ? 'CONCIERGE LINK ACTIVE' : 'VOICE PROTOCOL'}
+          </h3>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">
+            {isActive ? 'Direct neural audio stream...' : 'Unencrypted vocal interface'}
+          </p>
         </div>
       </div>
       
       <button 
         onClick={isActive ? stopSession : startSession}
         disabled={isConnecting}
-        className={`px-6 py-2 rounded-xl font-bold transition-all ${
-          isActive ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-purple-600 text-white hover:bg-purple-700'
+        className={`px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
+          isActive ? 'bg-red-950/40 text-red-500 border border-red-900/40 hover:bg-red-900/20' : 'bg-red-700 text-white hover:bg-red-600 shadow-xl shadow-red-900/20'
         }`}
       >
-        {isConnecting ? 'Connecting...' : isActive ? 'Disconnect' : 'Start Consultation'}
+        {isConnecting ? 'LINKING...' : isActive ? 'DISCONNECT' : 'INITIALIZE'}
       </button>
     </div>
   );

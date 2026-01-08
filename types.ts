@@ -6,8 +6,16 @@ export interface Note {
   tags: string[];
   updatedAt: number;
   relevanceScore?: number;
-  connections?: string[]; // IDs of related notes
+  connections?: string[];
   sourceUrl?: string;
+  imageUrl?: string; // AI generated visual representation
+}
+
+export interface AudioSession {
+  id: string;
+  title: string;
+  timestamp: number;
+  audioBlob?: Blob;
 }
 
 export interface ChatMessage {
@@ -25,7 +33,8 @@ export enum View {
   GRAPH = 'GRAPH',
   SMART_LOOKUP = 'SMART_LOOKUP',
   RESEARCH_LAB = 'RESEARCH_LAB',
-  WEB_IMPORT = 'WEB_IMPORT'
+  WEB_IMPORT = 'WEB_IMPORT',
+  STUDIO = 'STUDIO' // New Synthesis Studio view
 }
 
 export interface Decision {

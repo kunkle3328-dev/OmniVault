@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { Note } from '../types';
-import { Tag, Clock } from 'lucide-react';
+import { Clock, Image as ImageIcon } from 'lucide-react';
 
 interface NoteCardProps {
   note: Note;
@@ -12,36 +11,40 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onClick }) => {
   return (
     <div 
       onClick={() => onClick(note)}
-      className="group bg-[#16161a] border border-[#27272a] rounded-xl p-5 hover:border-purple-500/50 transition-all cursor-pointer relative overflow-hidden"
+      className="group bg-[#0f0f12] border border-zinc-800/80 rounded-[2rem] overflow-hidden hover:border-red-600/50 transition-all cursor-pointer relative shadow-xl hover:shadow-red-900/5"
     >
-      <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        {note.relevanceScore && (
-          <div className="bg-purple-900/40 border border-purple-500/30 text-purple-300 text-[10px] px-2 py-1 rounded-full font-mono">
-            Rel: {(note.relevanceScore * 100).toFixed(0)}%
+      <div className="h-28 w-full bg-[#08080a] relative overflow-hidden">
+        {note.imageUrl ? (
+          <img src={note.imageUrl} alt={note.title} className="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity duration-700 scale-105 group-hover:scale-100" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-zinc-900">
+            <ImageIcon size={40} strokeWidth={1} />
           </div>
         )}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f12] to-transparent" />
       </div>
-      
-      <h3 className="text-lg font-semibold text-[#f4f4f5] mb-2 group-hover:text-purple-400 transition-colors">
-        {note.title}
-      </h3>
-      
-      <p className="text-sm text-zinc-400 line-clamp-3 mb-4 leading-relaxed">
-        {note.content}
-      </p>
-      
-      <div className="flex flex-wrap items-center gap-3 mt-auto">
-        <div className="flex items-center gap-1 text-[11px] text-zinc-500 font-medium">
-          <Clock size={12} />
-          {new Date(note.updatedAt).toLocaleDateString()}
-        </div>
-        <div className="flex gap-2">
-          {note.tags.map(tag => (
-            <span key={tag} className="flex items-center gap-1 text-[10px] bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-md">
-              <Tag size={10} />
-              {tag}
-            </span>
-          ))}
+
+      <div className="p-7 pt-0 relative -mt-10">
+        <h3 className="text-xl font-black text-white mb-3 group-hover:text-red-500 transition-colors line-clamp-1 tracking-tight">
+          {note.title}
+        </h3>
+        
+        <p className="text-xs text-zinc-500 line-clamp-2 mb-6 leading-relaxed font-medium">
+          {note.content}
+        </p>
+        
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[9px] text-zinc-600 font-black uppercase tracking-[0.2em]">
+            <Clock size={12} />
+            {new Date(note.updatedAt).toLocaleDateString()}
+          </div>
+          <div className="flex gap-1.5">
+            {note.tags.slice(0, 2).map(tag => (
+              <span key={tag} className="text-[8px] font-black bg-red-950/30 text-red-500 border border-red-900/30 px-2 py-1 rounded-lg uppercase tracking-widest">
+                {tag}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>
