@@ -1,0 +1,7 @@
+{
+  "name": "OmniVault: Personal Knowledge Concierge",
+  "description": "Advanced AI research vault with semantic linking and live voice concierge.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
